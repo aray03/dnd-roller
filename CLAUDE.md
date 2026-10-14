@@ -1,0 +1,67 @@
+# CLAUDE.md
+
+Guidance for Claude when working in this repo. Keep it current: whenever something non-obvious is learned or decided during an issue, update this file in that issue's PR.
+
+## Project
+
+`dice-roller` is a Rust CLI for rolling D&D dice. The owner (GitHub `aray03`) is learning Rust.
+
+### Spec
+
+```
+dice-roller 3d10 ++ 5 5d20+30 8d20++90 1d100
+```
+
+- An expression is `NdM` (or `dM`, meaning `1dM`; `d` is case-insensitive) followed by zero or more modifiers:
+  - `+N` / `-N`: add/subtract N **once** to that roll's total. `5d20+30` → dice + 30.
+  - `++N` / `--N`: add/subtract N to **each die**. `3d10++5` → dice + 15.
+  - Modifiers chain: `2d6+3--1` → dice + 3 − 2.
+- Spaces around modifiers are allowed (`3d10 ++ 5`). All args are joined, then tokenized; a new expression starts at each `NdM`/`dM`. A modifier with no dice before it is an error.
+- No arguments → roll `1d20`.
+- Output: one line per expression (expression, individual dice, modifiers, subtotal; columns aligned), then a grand total:
+  ```
+  3d10++5    [4, 9, 2] ++5          → 30
+  5d20+30    [3, 17, 8, 11, 20] +30 → 89
+  Total: 119
+  ```
+- Errors: message on stderr naming the bad token, exit code 1, nothing rolled if any expression is invalid.
+- Limits: dice count 1–1000, sides ≥ 2, `i64` with checked arithmetic.
+- `--help` / `-h` print usage. Only those exact tokens trigger help, since `--` is also the per-die subtract modifier.
+
+### Design choices
+
+- **Args via `std::env::args`, not clap.** clap would treat `-2` and `--` as flags/separators, which clash with the modifier syntax.
+- **`rand` for randomness.** Roll functions take `&mut impl Rng` so tests can pass a seeded RNG and get deterministic results.
+- **Planned module layout:** `src/main.rs` (CLI glue), `src/parse.rs` (tokenize + parse into `DiceExpr`), `src/roll.rs` (evaluate into `RollResult`), `src/output.rs` (pure formatting functions).
+
+## Commands
+
+```
+cargo run -- <args>            # e.g. cargo run -- 3d10 ++ 5 1d20-2
+cargo fmt
+cargo clippy -- -D warnings
+cargo test
+```
+
+Run fmt, clippy and test before every commit.
+
+## Linear
+
+- Use the **`linear-dnd`** MCP server: workspace `aray03-personal`, team `ARA`, project "D&D Dice Roller". Do **not** use the user-level `linear` server, which points to a different workspace (TheMaiar).
+- Statuses: Backlog → Todo → In Progress → Done. Labels: Feature, Improvement, Bug.
+- Milestones: M1 Single roll, M2 Multiple rolls & output, M3 Polish & distribution. Issues are chained with "blocked by" relations in the order they should be done.
+
+## Git workflow
+
+- **Never commit or push directly to `main`.** `main` is protected on GitHub (PR required, applies to admins too), so direct pushes are rejected anyway.
+- One branch per issue, created from an up-to-date `origin/main` and named with the issue's Linear `gitBranchName` (e.g. `ray/ara-6-add-claudemd-with-project-conventions`).
+- Commit messages are prefixed with the issue ID: `ARA-6: Add CLAUDE.md`.
+- Push with `git push -u origin HEAD`, then `gh pr create --base main` with `Fixes ARA-N` in the body.
+- The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch, mark the issue Done in Linear.
+- The remote uses SSH (`git@github.com:aray03/dnd-roller.git`). HTTPS has no credentials on this machine.
+
+## Working style
+
+- Claude implements each issue; the owner reviews.
+- In each PR and summary, explain the Rust concepts the change uses (ownership, `Result`, traits, etc.). The point of this project is learning Rust.
+- Keep issues small and stick to the issue's scope; put follow-up ideas into new Linear issues instead.
