@@ -34,8 +34,9 @@ dice-roller [EXPRESSION]...
 ```
 
 Each expression is `NdM`: roll **N** dice with **M** sides. `dM` is short for
-`1dM`, and the `d` can be upper or lower case. With no expressions,
-`dice-roller` rolls a single `1d20`.
+`1dM`, and the `d` can be upper or lower case. A plain number **N** is short
+for `Nd20`, so `3` rolls three d20s and `2+14` is `2d20+14`. With no
+expressions, `dice-roller` rolls a single `1d20`.
 
 ### Modifiers
 
@@ -84,6 +85,14 @@ Chained modifiers, +3 once and −1 per die:
 $ dice-roller 2d6+3--1
 2d6+3--1  [0, 5] +3  → 8
 Total: 8
+```
+
+Three d20s with +5 on each, written as a plain number:
+
+```
+$ dice-roller 3++5
+3d20++5  [17, 9, 23]  → 49
+Total: 49
 ```
 
 Several rolls at once, with a combined total:

@@ -149,9 +149,32 @@ fn only_flat_modifiers_are_listed_after_the_dice() {
 }
 
 #[test]
+fn plain_numbers_roll_d20s() {
+    let run = run(&["3", "++", "5", "2+14"]);
+    assert_eq!(run.code, 0);
+    assert_eq!(run.stderr, "");
+
+    let (rolls, total) = parse_output(&run.stdout);
+    assert_eq!(rolls.len(), 2);
+
+    assert_eq!(rolls[0].expr, "3d20++5");
+    assert_eq!(rolls[0].dice.len(), 3);
+    assert!(rolls[0].dice.iter().all(|die| (6..=25).contains(die)));
+    assert_eq!(rolls[0].subtotal, rolls[0].dice.iter().sum::<i64>());
+
+    assert_eq!(rolls[1].expr, "2d20+14");
+    assert_eq!(rolls[1].dice.len(), 2);
+    assert!(rolls[1].dice.iter().all(|die| (1..=20).contains(die)));
+    assert_eq!(rolls[1].subtotal, rolls[1].dice.iter().sum::<i64>() + 14);
+
+    assert_eq!(total, rolls[0].subtotal + rolls[1].subtotal);
+}
+
+#[test]
 fn invalid_input_fails_with_a_message() {
-    let cases: [&[&str]; 8] = [
+    let cases: [&[&str]; 9] = [
         &["0d6"],
+        &["0"],
         &["1d1"],
         &["5000d6"],
         &["3x7"],

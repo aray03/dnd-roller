@@ -2,7 +2,7 @@ use std::process::ExitCode;
 
 use dice_roller::dice::DiceExpr;
 use dice_roller::output::format_rolls;
-use dice_roller::parse::{MAX_DICE, MIN_SIDES, parse_all};
+use dice_roller::parse::{DEFAULT_SIDES, MAX_DICE, MIN_SIDES, parse_all};
 use dice_roller::roll::{OverflowError, RollResult, checked_total, roll};
 
 /// What gets rolled when no arguments are given.
@@ -74,8 +74,8 @@ Roll D&D dice from the command line.
 
 Usage: dice-roller [EXPRESSION]...
 
-Each expression is NdM (N dice with M sides; dM means 1dM), followed by any
-number of modifiers:
+Each expression is NdM (N dice with M sides; dM means 1dM, and a plain number
+N means Nd{DEFAULT_SIDES}), followed by any number of modifiers:
   +X    add X once to the roll's total      5d20+30  → dice + 30
   -X    subtract X once                     1d20-2   → dice - 2
   ++X   add X to every die                  3d10++5  → dice + 15
@@ -88,6 +88,7 @@ expression; dice need at least {MIN_SIDES} sides.
 Examples:
   dice-roller                    roll a d20
   dice-roller 2d6+3              two d6s plus 3
+  dice-roller 3++5               three d{DEFAULT_SIDES}s, plus 5 on each
   dice-roller 3d10 ++ 5 1d100    several rolls with a combined total
 
 Options:
@@ -123,6 +124,7 @@ mod tests {
     fn usage_mentions_the_real_limits() {
         let text = usage();
         assert!(text.contains("rolls 1d20"));
+        assert!(text.contains(&format!("N means Nd{DEFAULT_SIDES}")));
         assert!(text.contains(&format!("Up to {MAX_DICE} dice")));
         assert!(text.contains(&format!("at least {MIN_SIDES} sides")));
     }
