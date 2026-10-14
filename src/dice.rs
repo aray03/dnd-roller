@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// One dice expression from the command line, e.g. `3d10++5-2`.
 ///
 /// ```
@@ -31,4 +33,60 @@ pub enum Modifier {
     Flat(i64),
     /// `++N` / `--N`: applied to every die. `3d10++5` adds 5 × 3 = 15.
     PerDie(i64),
+}
+
+/// Writes the expression the way it would be typed, e.g. `3d10++5-2`.
+/// `d20` is written as `1d20`.
+impl fmt::Display for DiceExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}d{}", self.count, self.sides)?;
+        for modifier in &self.modifiers {
+            write!(f, "{modifier}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Writes the modifier as typed: `+3`, `-2`, `++5` or `--1`.
+impl fmt::Display for Modifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (operator, value) = match *self {
+            Modifier::Flat(n) if n < 0 => ("-", n),
+            Modifier::Flat(n) => ("+", n),
+            Modifier::PerDie(n) if n < 0 => ("--", n),
+            Modifier::PerDie(n) => ("++", n),
+        };
+        write!(f, "{operator}{}", value.unsigned_abs())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use Modifier::{Flat, PerDie};
+
+    #[test]
+    fn modifiers_display_as_typed() {
+        assert_eq!(Flat(3).to_string(), "+3");
+        assert_eq!(Flat(-2).to_string(), "-2");
+        assert_eq!(PerDie(5).to_string(), "++5");
+        assert_eq!(PerDie(-1).to_string(), "--1");
+    }
+
+    #[test]
+    fn expressions_display_as_typed() {
+        let expr = DiceExpr {
+            count: 2,
+            sides: 6,
+            modifiers: vec![Flat(3), PerDie(-1)],
+        };
+        assert_eq!(expr.to_string(), "2d6+3--1");
+
+        let plain = DiceExpr {
+            count: 1,
+            sides: 20,
+            modifiers: vec![],
+        };
+        assert_eq!(plain.to_string(), "1d20");
+    }
 }

@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+use dice_roller::output::format_rolls;
 use dice_roller::parse::parse_all;
 use dice_roller::roll::roll;
 
@@ -27,9 +28,14 @@ fn main() -> ExitCode {
     };
 
     let mut rng = rand::rng();
-    for expr in &expressions {
-        // One subtotal per line for now; the full breakdown comes in ARA-15.
-        println!("{}", roll(expr, &mut rng).subtotal);
-    }
+    let rolls: Vec<_> = expressions
+        .into_iter()
+        .map(|expr| {
+            let result = roll(&expr, &mut rng);
+            (expr, result)
+        })
+        .collect();
+
+    println!("{}", format_rolls(&rolls));
     ExitCode::SUCCESS
 }
