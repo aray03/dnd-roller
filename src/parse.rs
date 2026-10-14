@@ -139,42 +139,7 @@ mod tests {
     fn rejects_malformed_expressions() {
         for bad in [
             "3x10", "d", "3d", "abc", "", "+3d6", "3d+6", "3d10d6", "3 d6",
-        ] {#[cfg(test)]
-mod tests {
-    use super::*;
-    use rand::SeedableRng;
-    use rand::rngs::StdRng;
-    use std::collections::HashSet;
-
-    #[test]
-    fn rolls_stay_within_range() {
-        let mut rng = StdRng::seed_from_u64(42);
-        for sides in [2, 4, 6, 8, 10, 12, 20, 100] {
-            for _ in 0..1_000 {
-                let value = roll_die(sides, &mut rng);
-                assert!(
-                    (1..=i64::from(sides)).contains(&value),
-                    "d{sides} rolled {value}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn every_face_shows_up() {
-        let mut rng = StdRng::seed_from_u64(7);
-        let seen: HashSet<i64> = (0..1_000).map(|_| roll_die(6, &mut rng)).collect();
-        assert_eq!(seen, (1..=6).collect());
-    }
-
-    #[test]
-    fn same_seed_gives_same_rolls() {
-        let mut a = StdRng::seed_from_u64(1);
-        let mut b = StdRng::seed_from_u64(1);
-        for _ in 0..100 {
-            assert_eq!(roll_die(20, &mut a), roll_die(20, &mut b));
-        }
-    }
+        ] {
             assert_eq!(
                 parse_expr(bad),
                 Err(ParseError::InvalidSyntax(bad.to_string())),
