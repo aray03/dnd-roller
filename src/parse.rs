@@ -10,6 +10,8 @@ pub enum ParseError {
     InvalidSyntax(String),
     /// A number is too large to fit. Holds the number's text.
     InvalidNumber(String),
+    /// A modifier like `+5` appeared before any dice. Holds the modifier's text.
+    ModifierWithoutDice(String),
 }
 
 impl fmt::Display for ParseError {
@@ -20,11 +22,39 @@ impl fmt::Display for ParseError {
                 "invalid dice expression \"{expr}\" (expected e.g. 3d6, d20 or 2d6+3)"
             ),
             ParseError::InvalidNumber(number) => write!(f, "number \"{number}\" is too large"),
+            ParseError::ModifierWithoutDice(modifier) => {
+                write!(f, "modifier \"{modifier}\" has no dice before it")
+            }
         }
     }
 }
 
 impl std::error::Error for ParseError {}
+
+/// Splits a whole command line into dice expressions and parses each one.
+///
+/// Spaces around modifiers are allowed, so `3d10 ++ 5 1d100` gives two
+/// expressions: `3d10++5` and `1d100`. A piece continues the current
+/// expression if it starts with `+`/`-`, or if the expression so far ends with
+/// `+`/`-` (so the `5` in `++ 5` belongs to it). Anything else starts a new
+/// expression.
+pub fn parse_all(input: &str) -> Result<Vec<DiceExpr>, ParseError> {
+    let mut expressions: Vec<String> = Vec::new();
+
+    for piece in input.split_whitespace() {
+        match expressions.last_mut() {
+            Some(current) if piece.starts_with(['+', '-']) || current.ends_with(['+', '-']) => {
+                current.push_str(piece);
+            }
+            None if piece.starts_with(['+', '-']) => {
+                return Err(ParseError::ModifierWithoutDice(piece.to_string()));
+            }
+            _ => expressions.push(piece.to_string()),
+        }
+    }
+
+    expressions.iter().map(|expr| parse_expr(expr)).collect()
+}
 
 /// Parses one dice expression such as `3d10`, `d20` (`dM` means `1dM`) or
 /// `2d6+3--1`. The `d` can be upper or lower case.
@@ -210,6 +240,75 @@ mod tests {
         assert_eq!(
             parse_expr("1d99999999999").unwrap_err().to_string(),
             "number \"99999999999\" is too large"
+        );
+    }
+
+    #[test]
+    fn parse_all_splits_the_example_command() {
+        assert_eq!(
+            parse_all("3d10 ++ 5 5d20+30 8d20++90 1d100"),
+            Ok(vec![
+                dice_with(3, 10, vec![PerDie(5)]),
+                dice_with(5, 20, vec![Flat(30)]),
+                dice_with(8, 20, vec![PerDie(90)]),
+                dice(1, 100),
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_all_allows_spaces_on_either_side_of_a_modifier() {
+        let expected = Ok(vec![dice_with(3, 10, vec![PerDie(5)])]);
+        assert_eq!(parse_all("3d10 ++5"), expected);
+        assert_eq!(parse_all("3d10++ 5"), expected);
+        assert_eq!(parse_all("3d10 ++ 5"), expected);
+        assert_eq!(parse_all("3d10++5"), expected);
+    }
+
+    #[test]
+    fn parse_all_handles_spaced_chains() {
+        assert_eq!(
+            parse_all("2d6 + 3 -- 1 d20"),
+            Ok(vec![
+                dice_with(2, 6, vec![Flat(3), PerDie(-1)]),
+                dice(1, 20)
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_all_of_nothing_is_empty() {
+        assert_eq!(parse_all(""), Ok(vec![]));
+        assert_eq!(parse_all("   "), Ok(vec![]));
+    }
+
+    #[test]
+    fn parse_all_rejects_modifier_without_dice() {
+        assert_eq!(
+            parse_all("+5 1d20"),
+            Err(ParseError::ModifierWithoutDice("+5".to_string()))
+        );
+        assert_eq!(
+            parse_all("+5 1d20").unwrap_err().to_string(),
+            "modifier \"+5\" has no dice before it"
+        );
+    }
+
+    #[test]
+    fn parse_all_reports_the_bad_expression() {
+        // A bare number after a finished expression starts a new (invalid) one.
+        assert_eq!(
+            parse_all("3d10 5"),
+            Err(ParseError::InvalidSyntax("5".to_string()))
+        );
+        assert_eq!(
+            parse_all("1d6 3x7 1d8"),
+            Err(ParseError::InvalidSyntax("3x7".to_string()))
+        );
+        // Modifiers are joined first, so the error shows the whole expression.
+        assert_eq!(
+            parse_all("3d10 + x"),
+            Err(ParseError::InvalidSyntax("3d10+x".to_string()))
         );
     }
 }
