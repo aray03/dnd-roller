@@ -48,6 +48,10 @@ cargo test
 
 Run fmt, clippy and test before every commit, **in the same shell command as `git add`/`git commit`** (chained with `&&`), so the files can't change between being checked and being committed. ARA-23: running them as separate commands let an untested, non-compiling `parse.rs` get committed and merged.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every PR into `main` and on pushes to `main`: one job named **`Check`** (ubuntu-latest) that runs `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`, the same commands as above. Actions used: `actions/checkout@v7`, `dtolnay/rust-toolchain@stable` (with rustfmt + clippy), `Swatinem/rust-cache@v2`. If CI fails on a PR, read the failing step's log (`gh pr checks`, `gh run view --log-failed`) and fix it with a new commit on the same branch.
+
 ## Linear
 
 - Use the **`linear-dnd`** MCP server: workspace `aray03-personal`, team `ARA`, project "D&D Dice Roller". Do **not** use the user-level `linear` server, which points to a different workspace (TheMaiar).
