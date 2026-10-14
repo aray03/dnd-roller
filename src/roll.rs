@@ -1,6 +1,20 @@
+use std::fmt;
+
 use rand::{Rng, RngExt};
 
 use crate::dice::{DiceExpr, Modifier};
+
+/// A result was too large (or too negative) to fit in an `i64`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverflowError;
+
+impl fmt::Display for OverflowError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "result is too large to calculate")
+    }
+}
+
+impl std::error::Error for OverflowError {}
 
 /// The outcome of rolling one `DiceExpr`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,20 +36,29 @@ pub fn roll_die(sides: u32, rng: &mut impl Rng) -> i64 {
 /// Rolls every die in `expr` and applies its modifiers.
 ///
 /// `Flat(n)` adds `n` once; `PerDie(n)` adds `n` for each die rolled.
-pub fn roll(expr: &DiceExpr, rng: &mut impl Rng) -> RollResult {
+/// Returns `OverflowError` instead of panicking if the math doesn't fit in an
+/// `i64`. Panics if `expr.sides` is 0 (the parser never produces that).
+pub fn roll(expr: &DiceExpr, rng: &mut impl Rng) -> Result<RollResult, OverflowError> {
     let dice: Vec<i64> = (0..expr.count).map(|_| roll_die(expr.sides, rng)).collect();
 
-    let modifier_total: i64 = expr
-        .modifiers
-        .iter()
-        .map(|modifier| match *modifier {
+    let mut subtotal = checked_total(dice.iter().copied())?;
+    for modifier in &expr.modifiers {
+        let amount = match *modifier {
             Modifier::Flat(n) => n,
-            Modifier::PerDie(n) => n * i64::from(expr.count),
-        })
-        .sum();
+            Modifier::PerDie(n) => n.checked_mul(i64::from(expr.count)).ok_or(OverflowError)?,
+        };
+        subtotal = subtotal.checked_add(amount).ok_or(OverflowError)?;
+    }
 
-    let subtotal = dice.iter().sum::<i64>() + modifier_total;
-    RollResult { dice, subtotal }
+    Ok(RollResult { dice, subtotal })
+}
+
+/// Adds up numbers, returning `OverflowError` instead of panicking or
+/// wrapping around if the sum doesn't fit in an `i64`.
+pub fn checked_total(values: impl IntoIterator<Item = i64>) -> Result<i64, OverflowError> {
+    values.into_iter().try_fold(0_i64, |total, value| {
+        total.checked_add(value).ok_or(OverflowError)
+    })
 }
 
 #[cfg(test)]
@@ -88,7 +111,7 @@ mod tests {
     /// Rolls `expr` with a fixed seed and checks the dice and subtotal against
     /// rolling the same dice one by one with an identically seeded RNG.
     fn check_roll(expr: &DiceExpr, expected_modifier_total: i64) {
-        let result = roll(expr, &mut StdRng::seed_from_u64(99));
+        let result = roll(expr, &mut StdRng::seed_from_u64(99)).unwrap();
 
         let mut rng = StdRng::seed_from_u64(99);
         let expected_dice: Vec<i64> = (0..expr.count)
@@ -128,7 +151,50 @@ mod tests {
     #[test]
     fn subtotal_can_go_negative() {
         // 1d4-10 is always between -9 and -6.
-        let result = roll(&expr(1, 4, vec![Flat(-10)]), &mut StdRng::seed_from_u64(5));
+        let result = roll(&expr(1, 4, vec![Flat(-10)]), &mut StdRng::seed_from_u64(5)).unwrap();
         assert!((-9..=-6).contains(&result.subtotal));
+    }
+
+    #[test]
+    fn largest_parseable_roll_does_not_overflow() {
+        // The parser allows up to 1000 dice and numbers up to u32::MAX.
+        let big = i64::from(u32::MAX);
+        let result = roll(
+            &expr(1000, u32::MAX, vec![PerDie(big), Flat(big)]),
+            &mut StdRng::seed_from_u64(3),
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn overflowing_modifiers_are_an_error_not_a_panic() {
+        let mut rng = StdRng::seed_from_u64(4);
+        // Per-die multiply overflows.
+        assert_eq!(
+            roll(&expr(2, 6, vec![PerDie(i64::MAX)]), &mut rng),
+            Err(OverflowError)
+        );
+        // Adding to the subtotal overflows.
+        assert_eq!(
+            roll(&expr(1, 6, vec![Flat(i64::MAX), Flat(i64::MAX)]), &mut rng),
+            Err(OverflowError)
+        );
+        // Going too far negative overflows too. (`i64::MIN` alone still fits
+        // once the die is added, so subtract a bit more.)
+        assert_eq!(
+            roll(&expr(1, 6, vec![Flat(i64::MIN), Flat(-10)]), &mut rng),
+            Err(OverflowError)
+        );
+    }
+
+    #[test]
+    fn checked_total_adds_or_reports_overflow() {
+        assert_eq!(checked_total([]), Ok(0));
+        assert_eq!(checked_total([1, 2, -4]), Ok(-1));
+        assert_eq!(checked_total([i64::MAX, 1]), Err(OverflowError));
+        assert_eq!(
+            OverflowError.to_string(),
+            "result is too large to calculate"
+        );
     }
 }
