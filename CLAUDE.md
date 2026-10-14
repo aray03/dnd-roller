@@ -54,10 +54,11 @@ Run fmt, clippy and test before every commit.
 ## Git workflow
 
 - **Never commit or push directly to `main`.** `main` is protected on GitHub (PR required, applies to admins too), so direct pushes are rejected anyway.
-- One branch per issue, created from an up-to-date `origin/main` and named with the issue's Linear `gitBranchName` (e.g. `ray/ara-6-add-claudemd-with-project-conventions`).
+- One branch per issue, created from an up-to-date `origin/main`.
+- **Branch names are short:** `ara-<number>-<1–3 word name>`, lowercase, hyphenated, no `ray/` prefix. E.g. ARA-22 "Simplify Branch Names" → `ara-22-branch-names`, ARA-8 "Add rand and a roll_die function" → `ara-8-roll-die`. Do **not** use Linear's `gitBranchName` (too long). Keeping `ara-<number>` in the name still lets Linear's GitHub integration link the branch/PR to the issue.
 - Commit messages are prefixed with the issue ID: `ARA-6: Add CLAUDE.md`.
 - Push with `git push -u origin HEAD`, then `gh pr create --base main` with `Fixes ARA-N` in the body.
-- The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch, mark the issue Done in Linear.
+- The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch and the remote branch (`git push origin --delete <branch>`), mark the issue Done in Linear.
 - The remote uses SSH (`git@github.com:aray03/dnd-roller.git`). HTTPS has no credentials on this machine.
 
 ## Working style
