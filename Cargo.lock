@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "dnd-roller"
+name = "dice-roller"
 version = "0.1.0"
