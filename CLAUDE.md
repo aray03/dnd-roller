@@ -60,6 +60,7 @@ Run fmt, clippy and test before every commit.
 - Commit messages are prefixed with the issue ID: `ARA-6: Add CLAUDE.md`.
 - Push with `git push -u origin HEAD`, then `gh pr create --base main` with `Fixes ARA-N` in the body.
 - The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch and the remote branch (`git push origin --delete <branch>`), mark the issue Done in Linear.
+- Don't rename a branch that has an open PR: GitHub closes the PR (it only moves PRs over when the *target* branch is renamed). Pick the right name before pushing.
 - The remote uses SSH (`git@github.com:aray03/dnd-roller.git`). HTTPS has no credentials on this machine.
 
 ## Working style
