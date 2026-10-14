@@ -54,6 +54,14 @@ Run fmt, clippy and test before every commit, **in the same shell command as `gi
 
 **`Check` is a required status check on `main`** (branch protection, pinned to the GitHub Actions app, "require branches to be up to date" on): a PR can't be merged until `Check` passes on the PR combined with the latest `main`. If `main` moved after CI ran, the PR needs "Update branch" and a fresh green run. If the job is ever renamed, update the required check in branch protection too, or every PR will be stuck waiting for a check that never reports.
 
+## Releases
+
+`.github/workflows/release.yml` builds `dice-roller` for `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` and `aarch64-apple-darwin` (one matrix job each, running `cargo test` first), packages each with the README (`.tar.gz`, or `.zip` on Windows), and publishes a GitHub Release with the three archives plus `SHA256SUMS.txt`.
+
+- It **publishes** only when a `v*` tag is pushed. PRs that change `release.yml` run the builds without publishing, so the workflow can be tested first.
+- The tag must match `version` in `Cargo.toml` (`v0.1.0` ↔ `0.1.0`), or the build fails.
+- To release: bump `version` in `Cargo.toml` through a normal issue/PR, merge it, then on an up-to-date `main` run `git tag vX.Y.Z && git push origin vX.Y.Z`. **Creating or pushing a tag publishes a public release, so only do it when the owner explicitly asks.** Tags aren't covered by branch protection.
+
 ## Linear
 
 - Use the **`linear-dnd`** MCP server: workspace `aray03-personal`, team `ARA`, project "D&D Dice Roller". Do **not** use the user-level `linear` server, which points to a different workspace (TheMaiar).
