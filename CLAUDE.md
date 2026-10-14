@@ -45,7 +45,7 @@ cargo clippy --all-targets -- -D warnings   # --all-targets also lints test code
 cargo test
 ```
 
-Run fmt, clippy and test before every commit.
+Run fmt, clippy and test before every commit, **in the same shell command as `git add`/`git commit`** (chained with `&&`), so the files can't change between being checked and being committed. ARA-23: running them as separate commands let an untested, non-compiling `parse.rs` get committed and merged.
 
 ## Linear
 
