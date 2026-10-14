@@ -18,10 +18,10 @@ dice-roller 3d10 ++ 5 5d20+30 8d20++90 1d100
   - Modifiers chain: `2d6+3--1` → dice + 3 − 2.
 - Spaces around modifiers are allowed (`3d10 ++ 5`). All args are joined, then tokenized; a new expression starts at each `NdM`/`dM`. A modifier with no dice before it is an error.
 - No arguments → roll `1d20`.
-- Output: one line per expression (expression, individual dice, modifiers, subtotal; columns aligned), then a grand total:
+- Output: one line per expression (expression written canonically, e.g. `d20` → `1d20`; raw dice; modifiers; subtotal right-aligned after `→`; columns separated by two spaces and aligned), then a grand total:
   ```
-  3d10++5    [4, 9, 2] ++5          → 30
-  5d20+30    [3, 17, 8, 11, 20] +30 → 89
+  3d10++5  [4, 9, 2] ++5           → 30
+  5d20+30  [3, 17, 8, 11, 20] +30  → 89
   Total: 119
   ```
 - Errors: message on stderr naming the bad token, exit code 1, nothing rolled if any expression is invalid.
@@ -33,7 +33,7 @@ dice-roller 3d10 ++ 5 5d20+30 8d20++90 1d100
 - **Args via `std::env::args`, not clap.** clap would treat `-2` and `--` as flags/separators, which clash with the modifier syntax.
 - **`rand` 0.10 for randomness.** Roll functions take `&mut impl Rng` so tests can pass a seeded RNG (`StdRng::seed_from_u64`) and get deterministic results. Note the 0.10 API: `Rng` is the base trait, and helper methods like `random_range` live on the `RngExt` trait, which must be imported (`use rand::{Rng, RngExt};`). Older docs/tutorials that call `rng.gen_range` or use `thread_rng()` are out of date.
 - **Library + binary split.** `src/lib.rs` declares the modules as `pub mod`; `src/main.rs` is a thin CLI that uses the library (`dice_roller::...`). This avoids dead-code warnings for functions that aren't wired into `main` yet, and lets integration tests in `tests/` call the library directly.
-- **Module layout:** `src/lib.rs` (module list), `src/main.rs` (CLI glue: `fn main() -> ExitCode`, errors via `eprintln!` + `ExitCode::FAILURE`, real rolls use `rand::rng()`), `src/dice.rs` (data types: `DiceExpr`, `Modifier` enum with `Flat`/`PerDie`, values signed so subtraction is negative), `src/parse.rs` (`parse_all(&str)` splits the joined command line into expressions, then `parse_expr` parses each one → `Result<DiceExpr, ParseError>`, including modifier chains; when matching operators, try `++`/`--` before `+`/`-`. Splitting rule: a whitespace piece continues the current expression if it starts with `+`/`-` or the expression so far ends with `+`/`-`; otherwise it starts a new one. A modifier before any dice is `ParseError::ModifierWithoutDice`), `src/roll.rs` (`roll_die`; `roll(&DiceExpr, rng) -> RollResult { dice, subtotal }`, where `dice` are raw face values and `subtotal` includes all modifiers), planned: `src/output.rs` (pure formatting functions).
+- **Module layout:** `src/lib.rs` (module list), `src/main.rs` (CLI glue: `fn main() -> ExitCode`, errors via `eprintln!` + `ExitCode::FAILURE`, real rolls use `rand::rng()`), `src/dice.rs` (data types: `DiceExpr`, `Modifier` enum with `Flat`/`PerDie`, values signed so subtraction is negative), `src/parse.rs` (`parse_all(&str)` splits the joined command line into expressions, then `parse_expr` parses each one → `Result<DiceExpr, ParseError>`, including modifier chains; when matching operators, try `++`/`--` before `+`/`-`. Splitting rule: a whitespace piece continues the current expression if it starts with `+`/`-` or the expression so far ends with `+`/`-`; otherwise it starts a new one. A modifier before any dice is `ParseError::ModifierWithoutDice`), `src/roll.rs` (`roll_die`; `roll(&DiceExpr, rng) -> RollResult { dice, subtotal }`, where `dice` are raw face values and `subtotal` includes all modifiers), `src/output.rs` (`format_rolls(&[(DiceExpr, RollResult)]) -> String`, a pure function with no trailing newline; `DiceExpr`/`Modifier` implement `Display` in `dice.rs` to print themselves as typed).
 - **Parsing numbers:** check that text is all ASCII digits before calling `str::parse::<u32>()`, because `parse` also accepts a leading `+` (`"+3"` → 3), which would let `+3d6` or `3d+6` slip through. Non-digit text → `ParseError::InvalidSyntax`; digits that overflow `u32` → `ParseError::InvalidNumber`.
 
 ## Commands
