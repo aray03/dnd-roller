@@ -53,6 +53,7 @@ Run fmt, clippy and test before every commit.
 
 ## Git workflow
 
+- **Never commit, push, or open/edit a PR unless the owner explicitly says to.** Making file changes is fine; stop before `git commit`/`git push`/`gh pr` and ask.
 - **Never commit or push directly to `main`.** `main` is protected on GitHub (PR required, applies to admins too), so direct pushes are rejected anyway.
 - One branch per issue, created from an up-to-date `origin/main`.
 - **Branch names are short:** `<number>-<1–3 word name>`, lowercase, hyphenated, no `ara-` or `ray/` prefix. E.g. ARA-22 "Simplify Branch Names" → `22-branch-names`, ARA-8 "Add rand and a roll_die function" → `8-roll-die`. Do **not** use Linear's `gitBranchName` (too long).
