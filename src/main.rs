@@ -1,8 +1,9 @@
 use std::process::ExitCode;
 
+use dice_roller::dice::DiceExpr;
 use dice_roller::output::format_rolls;
 use dice_roller::parse::parse_all;
-use dice_roller::roll::roll;
+use dice_roller::roll::{OverflowError, RollResult, checked_total, roll};
 
 /// What gets rolled when no arguments are given.
 const DEFAULT_EXPR: &str = "1d20";
@@ -27,15 +28,28 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut rng = rand::rng();
-    let rolls: Vec<_> = expressions
-        .into_iter()
-        .map(|expr| {
-            let result = roll(&expr, &mut rng);
-            (expr, result)
-        })
-        .collect();
+    match roll_all(expressions) {
+        Ok((rolls, total)) => {
+            println!("{}", format_rolls(&rolls, total));
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("error: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
 
-    println!("{}", format_rolls(&rolls));
-    ExitCode::SUCCESS
+/// Rolls every expression and adds up the grand total.
+fn roll_all(
+    expressions: Vec<DiceExpr>,
+) -> Result<(Vec<(DiceExpr, RollResult)>, i64), OverflowError> {
+    let mut rng = rand::rng();
+    let rolls = expressions
+        .into_iter()
+        .map(|expr| roll(&expr, &mut rng).map(|result| (expr, result)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let total = checked_total(rolls.iter().map(|(_, result)| result.subtotal))?;
+    Ok((rolls, total))
 }

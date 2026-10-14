@@ -2,6 +2,11 @@ use std::fmt;
 
 use crate::dice::{DiceExpr, Modifier};
 
+/// Most dice allowed in one expression (`1000d6` is fine, `1001d6` isn't).
+pub const MAX_DICE: u32 = 1000;
+/// Fewest sides a die can have.
+pub const MIN_SIDES: u32 = 2;
+
 /// Why a dice expression couldn't be parsed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
@@ -12,6 +17,10 @@ pub enum ParseError {
     InvalidNumber(String),
     /// A modifier like `+5` appeared before any dice. Holds the modifier's text.
     ModifierWithoutDice(String),
+    /// The dice count is outside `1..=MAX_DICE`. Holds the whole expression.
+    InvalidCount(String),
+    /// A die has fewer than `MIN_SIDES` sides. Holds the whole expression.
+    InvalidSides(String),
 }
 
 impl fmt::Display for ParseError {
@@ -25,6 +34,14 @@ impl fmt::Display for ParseError {
             ParseError::ModifierWithoutDice(modifier) => {
                 write!(f, "modifier \"{modifier}\" has no dice before it")
             }
+            ParseError::InvalidCount(expr) => write!(
+                f,
+                "invalid dice count in \"{expr}\" (must be between 1 and {MAX_DICE})"
+            ),
+            ParseError::InvalidSides(expr) => write!(
+                f,
+                "invalid number of sides in \"{expr}\" (must be at least {MIN_SIDES})"
+            ),
         }
     }
 }
@@ -74,6 +91,13 @@ pub fn parse_expr(input: &str) -> Result<DiceExpr, ParseError> {
     };
     let sides = parse_number(sides_text, input)?;
     let modifiers = parse_modifiers(modifiers_text, input)?;
+
+    if !(1..=MAX_DICE).contains(&count) {
+        return Err(ParseError::InvalidCount(input.to_string()));
+    }
+    if sides < MIN_SIDES {
+        return Err(ParseError::InvalidSides(input.to_string()));
+    }
 
     Ok(DiceExpr {
         count,
@@ -309,6 +333,51 @@ mod tests {
         assert_eq!(
             parse_all("3d10 + x"),
             Err(ParseError::InvalidSyntax("3d10+x".to_string()))
+        );
+    }
+
+    #[test]
+    fn dice_count_must_be_between_1_and_max() {
+        assert_eq!(parse_expr("1d6"), Ok(dice(1, 6)));
+        assert_eq!(parse_expr("1000d6"), Ok(dice(1000, 6)));
+        for bad in ["0d6", "1001d6", "5000d6", "0d6+3"] {
+            assert_eq!(
+                parse_expr(bad),
+                Err(ParseError::InvalidCount(bad.to_string())),
+                "input: {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn dice_need_at_least_two_sides() {
+        assert_eq!(parse_expr("1d2"), Ok(dice(1, 2)));
+        for bad in ["1d1", "1d0", "d0", "3d1--1"] {
+            assert_eq!(
+                parse_expr(bad),
+                Err(ParseError::InvalidSides(bad.to_string())),
+                "input: {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn limit_errors_are_readable() {
+        assert_eq!(
+            parse_expr("0d6").unwrap_err().to_string(),
+            "invalid dice count in \"0d6\" (must be between 1 and 1000)"
+        );
+        assert_eq!(
+            parse_expr("1d1").unwrap_err().to_string(),
+            "invalid number of sides in \"1d1\" (must be at least 2)"
+        );
+    }
+
+    #[test]
+    fn one_bad_expression_fails_the_whole_command() {
+        assert_eq!(
+            parse_all("1d20 5000d6 1d8"),
+            Err(ParseError::InvalidCount("5000d6".to_string()))
         );
     }
 }

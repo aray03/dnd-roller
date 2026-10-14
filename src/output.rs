@@ -10,8 +10,10 @@ use crate::roll::RollResult;
 /// ```
 ///
 /// Each line shows the expression, the raw dice, the modifiers, and the
-/// subtotal. The returned string has no trailing newline.
-pub fn format_rolls(rolls: &[(DiceExpr, RollResult)]) -> String {
+/// subtotal. `total` is passed in (rather than summed here) so the caller can
+/// compute it with overflow checking. The returned string has no trailing
+/// newline.
+pub fn format_rolls(rolls: &[(DiceExpr, RollResult)], total: i64) -> String {
     let rows: Vec<Row> = rolls
         .iter()
         .map(|(expr, result)| Row::new(expr, result))
@@ -39,7 +41,6 @@ pub fn format_rolls(rolls: &[(DiceExpr, RollResult)]) -> String {
         })
         .collect();
 
-    let total: i64 = rows.iter().map(|row| row.subtotal).sum();
     lines.push(format!("Total: {total}"));
     lines.join("\n")
 }
@@ -95,7 +96,7 @@ mod tests {
     #[test]
     fn single_roll_without_modifiers() {
         let rolls = [roll_of(1, 20, vec![], vec![14], 14)];
-        assert_eq!(format_rolls(&rolls), "1d20  [14]  → 14\nTotal: 14");
+        assert_eq!(format_rolls(&rolls, 14), "1d20  [14]  → 14\nTotal: 14");
     }
 
     #[test]
@@ -110,7 +111,7 @@ mod tests {
 5d20+30  [3, 17, 8, 11, 20] +30  → 89
 1d100    [7]                     →  7
 Total: 126";
-        assert_eq!(format_rolls(&rolls), expected);
+        assert_eq!(format_rolls(&rolls, 126), expected);
     }
 
     #[test]
@@ -123,15 +124,15 @@ Total: 126";
 2d6+3--1  [5, 2] +3 --1  →  8
 1d4-10    [3] -10        → -7
 Total: 1";
-        assert_eq!(format_rolls(&rolls), expected);
+        assert_eq!(format_rolls(&rolls, 1), expected);
     }
 
     #[test]
-    fn total_is_the_sum_of_subtotals() {
+    fn prints_the_given_total() {
         let rolls = [
             roll_of(1, 6, vec![], vec![6], 6),
             roll_of(1, 6, vec![], vec![1], 1),
         ];
-        assert!(format_rolls(&rolls).ends_with("\nTotal: 7"));
+        assert!(format_rolls(&rolls, 7).ends_with("\nTotal: 7"));
     }
 }
