@@ -6,6 +6,8 @@ use crate::dice::{DiceExpr, Modifier};
 pub const MAX_DICE: u32 = 1000;
 /// Fewest sides a die can have.
 pub const MIN_SIDES: u32 = 2;
+/// Sides used when an expression is just a number, e.g. `3` means `3d20`.
+pub const DEFAULT_SIDES: u32 = 20;
 
 /// Why a dice expression couldn't be parsed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,22 +76,31 @@ pub fn parse_all(input: &str) -> Result<Vec<DiceExpr>, ParseError> {
 }
 
 /// Parses one dice expression such as `3d10`, `d20` (`dM` means `1dM`) or
-/// `2d6+3--1`. The `d` can be upper or lower case.
+/// `2d6+3--1`. The `d` can be upper or lower case. A plain number rolls that
+/// many d20s, so `3` means `3d20` and `2+14` means `2d20+14`.
 pub fn parse_expr(input: &str) -> Result<DiceExpr, ParseError> {
-    let Some((count_text, rest)) = input.split_once(['d', 'D']) else {
-        return Err(ParseError::InvalidSyntax(input.to_string()));
+    let (count, sides, modifiers_text) = match input.split_once(['d', 'D']) {
+        Some((count_text, rest)) => {
+            // The sides run up to the first `+` or `-`; everything after is
+            // modifiers.
+            let (sides_text, modifiers_text) = split_at_modifiers(rest);
+            let count = if count_text.is_empty() {
+                1
+            } else {
+                parse_number(count_text, input)?
+            };
+            (count, parse_number(sides_text, input)?, modifiers_text)
+        }
+        None => {
+            // No `d`: the number before the modifiers is the dice count.
+            let (count_text, modifiers_text) = split_at_modifiers(input);
+            (
+                parse_number(count_text, input)?,
+                DEFAULT_SIDES,
+                modifiers_text,
+            )
+        }
     };
-
-    // The sides run up to the first `+` or `-`; everything after is modifiers.
-    let modifiers_start = rest.find(['+', '-']).unwrap_or(rest.len());
-    let (sides_text, modifiers_text) = rest.split_at(modifiers_start);
-
-    let count = if count_text.is_empty() {
-        1
-    } else {
-        parse_number(count_text, input)?
-    };
-    let sides = parse_number(sides_text, input)?;
     let modifiers = parse_modifiers(modifiers_text, input)?;
 
     if !(1..=MAX_DICE).contains(&count) {
@@ -104,6 +115,13 @@ pub fn parse_expr(input: &str) -> Result<DiceExpr, ParseError> {
         sides,
         modifiers,
     })
+}
+
+/// Splits `text` at its first `+` or `-`, e.g. `10++5` → (`10`, `++5`).
+/// If there's no modifier, the second part is empty.
+fn split_at_modifiers(text: &str) -> (&str, &str) {
+    let modifiers_start = text.find(['+', '-']).unwrap_or(text.len());
+    text.split_at(modifiers_start)
 }
 
 /// Parses a chain of modifiers like `+3--1` into `[Flat(3), PerDie(-1)]`.
@@ -190,9 +208,37 @@ mod tests {
     }
 
     #[test]
+    fn plain_number_rolls_that_many_d20s() {
+        assert_eq!(parse_expr("3"), Ok(dice(3, 20)));
+        assert_eq!(parse_expr("1"), Ok(dice(1, 20)));
+        assert_eq!(parse_expr("3++5"), Ok(dice_with(3, 20, vec![PerDie(5)])));
+        assert_eq!(parse_expr("2+14"), Ok(dice_with(2, 20, vec![Flat(14)])));
+        assert_eq!(
+            parse_expr("2+3--1"),
+            Ok(dice_with(2, 20, vec![Flat(3), PerDie(-1)]))
+        );
+    }
+
+    #[test]
+    fn plain_number_follows_the_same_limits() {
+        assert_eq!(
+            parse_expr("0"),
+            Err(ParseError::InvalidCount("0".to_string()))
+        );
+        assert_eq!(
+            parse_expr("1001"),
+            Err(ParseError::InvalidCount("1001".to_string()))
+        );
+        assert_eq!(
+            parse_expr("99999999999"),
+            Err(ParseError::InvalidNumber("99999999999".to_string()))
+        );
+    }
+
+    #[test]
     fn rejects_malformed_expressions() {
         for bad in [
-            "3x10", "d", "3d", "abc", "", "+3d6", "3d+6", "3d10d6", "3 d6",
+            "3x10", "d", "3d", "abc", "", "+3d6", "3d+6", "3d10d6", "3 d6", "+5", "3+", "3x",
         ] {
             assert_eq!(
                 parse_expr(bad),
@@ -319,12 +365,20 @@ mod tests {
     }
 
     #[test]
-    fn parse_all_reports_the_bad_expression() {
-        // A bare number after a finished expression starts a new (invalid) one.
+    fn parse_all_handles_plain_numbers() {
+        // A bare number after a finished expression starts a new one: 5d20.
+        assert_eq!(parse_all("3d10 5"), Ok(vec![dice(3, 10), dice(5, 20)]));
         assert_eq!(
-            parse_all("3d10 5"),
-            Err(ParseError::InvalidSyntax("5".to_string()))
+            parse_all("3 ++ 5 2+14"),
+            Ok(vec![
+                dice_with(3, 20, vec![PerDie(5)]),
+                dice_with(2, 20, vec![Flat(14)]),
+            ])
         );
+    }
+
+    #[test]
+    fn parse_all_reports_the_bad_expression() {
         assert_eq!(
             parse_all("1d6 3x7 1d8"),
             Err(ParseError::InvalidSyntax("3x7".to_string()))
