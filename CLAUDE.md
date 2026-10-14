@@ -31,15 +31,16 @@ dice-roller 3d10 ++ 5 5d20+30 8d20++90 1d100
 ### Design choices
 
 - **Args via `std::env::args`, not clap.** clap would treat `-2` and `--` as flags/separators, which clash with the modifier syntax.
-- **`rand` for randomness.** Roll functions take `&mut impl Rng` so tests can pass a seeded RNG and get deterministic results.
-- **Planned module layout:** `src/main.rs` (CLI glue), `src/parse.rs` (tokenize + parse into `DiceExpr`), `src/roll.rs` (evaluate into `RollResult`), `src/output.rs` (pure formatting functions).
+- **`rand` 0.10 for randomness.** Roll functions take `&mut impl Rng` so tests can pass a seeded RNG (`StdRng::seed_from_u64`) and get deterministic results. Note the 0.10 API: `Rng` is the base trait, and helper methods like `random_range` live on the `RngExt` trait, which must be imported (`use rand::{Rng, RngExt};`). Older docs/tutorials that call `rng.gen_range` or use `thread_rng()` are out of date.
+- **Library + binary split.** `src/lib.rs` declares the modules as `pub mod`; `src/main.rs` is a thin CLI that uses the library (`dice_roller::...`). This avoids dead-code warnings for functions that aren't wired into `main` yet, and lets integration tests in `tests/` call the library directly.
+- **Module layout:** `src/lib.rs` (module list), `src/main.rs` (CLI glue), `src/roll.rs` (`roll_die`, later evaluate into `RollResult`), planned: `src/parse.rs` (tokenize + parse into `DiceExpr`), `src/output.rs` (pure formatting functions).
 
 ## Commands
 
 ```
 cargo run -- <args>            # e.g. cargo run -- 3d10 ++ 5 1d20-2
 cargo fmt
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings   # --all-targets also lints test code
 cargo test
 ```
 
