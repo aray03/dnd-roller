@@ -1,0 +1,47 @@
+name: CI
+
+# Run on every pull request into main, and on main itself after a merge.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# The workflow only needs to read the code.
+permissions:
+  contents: read
+
+# If new commits are pushed to a PR while CI is still running, cancel the
+# old run instead of finishing it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    # This name is what shows up on the PR and what branch protection requires.
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Install Rust (stable, with rustfmt and clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Lints
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
