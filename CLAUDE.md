@@ -53,11 +53,15 @@ Run fmt, clippy and test before every commit.
 
 ## Git workflow
 
+- **Never commit, push, or open/edit a PR unless the owner explicitly says to.** Making file changes is fine; stop before `git commit`/`git push`/`gh pr` and ask.
 - **Never commit or push directly to `main`.** `main` is protected on GitHub (PR required, applies to admins too), so direct pushes are rejected anyway.
-- One branch per issue, created from an up-to-date `origin/main` and named with the issue's Linear `gitBranchName` (e.g. `ray/ara-6-add-claudemd-with-project-conventions`).
+- One branch per issue, created from an up-to-date `origin/main`.
+- **Branch names are short:** `<number>-<1–3 word name>`, lowercase, hyphenated, no `ara-` or `ray/` prefix. E.g. ARA-22 "Simplify Branch Names" → `22-branch-names`, ARA-8 "Add rand and a roll_die function" → `8-roll-die`. Do **not** use Linear's `gitBranchName` (too long).
+- **PR titles are `ARA-<number>: <full Linear issue title>`**, copied exactly from Linear. E.g. `ARA-22: Simplify Branch Names`. The `ARA-<number>` in the title and `Fixes ARA-<number>` in the body are what link the PR to the Linear issue, since branch names no longer contain it.
 - Commit messages are prefixed with the issue ID: `ARA-6: Add CLAUDE.md`.
 - Push with `git push -u origin HEAD`, then `gh pr create --base main` with `Fixes ARA-N` in the body.
-- The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch, mark the issue Done in Linear.
+- The owner reviews and merges the PR. Claude never merges. After merge: switch to `main`, pull, delete the local branch and the remote branch (`git push origin --delete <branch>`), mark the issue Done in Linear.
+- Don't rename a branch that has an open PR: GitHub closes the PR (it only moves PRs over when the *target* branch is renamed). Pick the right name before pushing.
 - The remote uses SSH (`git@github.com:aray03/dnd-roller.git`). HTTPS has no credentials on this machine.
 
 ## Working style
