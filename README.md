@@ -5,10 +5,10 @@ expressions at once and see a bunch of dice data.
 
 ```
 $ dice-roller 3d10 ++ 5 5d20+30 8d20++90 1d100
-3d10++5   [4, 9, 6] ++5                        →  34
-5d20+30   [1, 2, 15, 20, 9] +30                →  77
-8d20++90  [12, 5, 15, 4, 15, 13, 10, 20] ++90  → 814
-1d100     [66]                                 →  66
+3d10++5   [9, 14, 11]                             →  34
+5d20+30   [1, 2, 15, 20, 9] +30                   →  77
+8d20++90  [102, 95, 105, 94, 105, 103, 100, 110]  → 814
+1d100     [66]                                    →  66
 Total: 991
 ```
 
@@ -51,6 +51,10 @@ Add any number of modifiers after the dice:
 Modifiers can be chained (`2d6+3--1`), and spaces around them are fine:
 `3d10 ++ 5` is the same as `3d10++5`.
 
+In the output, `++X` / `--X` are already applied to the dice in the brackets,
+so `3d20++3` rolling 5, 6 and 12 shows `[8, 9, 15]`. `+X` / `-X` are listed
+after the brackets, since they apply to the total rather than to any one die.
+
 ### Limits
 
 - 1 to 1000 dice per expression
@@ -78,7 +82,7 @@ Chained modifiers, +3 once and −1 per die:
 
 ```
 $ dice-roller 2d6+3--1
-2d6+3--1  [1, 6] +3 --1  → 8
+2d6+3--1  [0, 5] +3  → 8
 Total: 8
 ```
 

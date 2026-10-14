@@ -26,9 +26,10 @@ fn run(args: &[&str]) -> Run {
     }
 }
 
-/// One parsed line of roll output, e.g. `3d10++5  [4, 9, 2] ++5  → 30`.
+/// One parsed line of roll output, e.g. `3d10++5-2  [9, 14, 7] -2  → 28`.
 struct RollLine {
     expr: String,
+    /// The numbers in the brackets: each die with `++N` / `--N` applied.
     dice: Vec<i64>,
     subtotal: i64,
 }
@@ -91,15 +92,17 @@ fn example_command_rolls_every_expression() {
     assert_eq!(run.stderr, "");
 
     let (rolls, total) = parse_output(&run.stdout);
+    // (expression, dice count, range of each adjusted die, flat modifier
+    // total, subtotal range)
     let expected = [
-        ("3d10++5", 3, 1..=10, 15, 18..=45),
+        ("3d10++5", 3, 6..=15, 0, 18..=45),
         ("5d20+30", 5, 1..=20, 30, 35..=130),
-        ("8d20++90", 8, 1..=20, 720, 728..=880),
+        ("8d20++90", 8, 91..=110, 0, 728..=880),
         ("1d100", 1, 1..=100, 0, 1..=100),
     ];
     assert_eq!(rolls.len(), expected.len());
 
-    for (roll, (expr, count, faces, modifier_total, subtotal_range)) in rolls.iter().zip(expected) {
+    for (roll, (expr, count, faces, flat_total, subtotal_range)) in rolls.iter().zip(expected) {
         assert_eq!(roll.expr, expr);
         assert_eq!(roll.dice.len(), count, "{expr}: wrong number of dice");
         assert!(
@@ -108,8 +111,8 @@ fn example_command_rolls_every_expression() {
         );
         assert_eq!(
             roll.subtotal,
-            roll.dice.iter().sum::<i64>() + modifier_total,
-            "{expr}: subtotal doesn't match dice + modifiers"
+            roll.dice.iter().sum::<i64>() + flat_total,
+            "{expr}: subtotal doesn't match dice + flat modifiers"
         );
         assert!(
             subtotal_range.contains(&roll.subtotal),
@@ -130,7 +133,19 @@ fn spaced_per_die_subtract_still_rolls() {
     let (rolls, _) = parse_output(&run.stdout);
     assert_eq!(rolls.len(), 1);
     assert_eq!(rolls[0].expr, "2d6--1");
-    assert_eq!(rolls[0].subtotal, rolls[0].dice.iter().sum::<i64>() - 2);
+    assert!(rolls[0].dice.iter().all(|die| (0..=5).contains(die)));
+    assert_eq!(rolls[0].subtotal, rolls[0].dice.iter().sum::<i64>());
+}
+
+#[test]
+fn only_flat_modifiers_are_listed_after_the_dice() {
+    let run = run(&["2d6+3--1"]);
+    assert_eq!(run.code, 0);
+
+    let line = run.stdout.lines().next().expect("no output");
+    let (_, after_dice) = line.split_once(']').expect("no `]` in line");
+    let (modifiers, _) = after_dice.split_once('→').expect("no `→` in line");
+    assert_eq!(modifiers.trim(), "+3");
 }
 
 #[test]
